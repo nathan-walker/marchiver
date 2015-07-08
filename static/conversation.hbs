@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Conversation with {{human_name}}</title>
+	<link href="../style.css" rel="stylesheet" type="text/css">  
+</head>
+<body>
+    <div class="main-content">
+    		<div class="title">
+    			<h1>Conversation with {{human_name}}</h1>
+    		</div>
+	    	<div class="message-thread" id="thread">
+	    		{{#messages}}
+	    		<div class="message{{#unless sender}} {{protocol}}{{/unless}}">
+	    			{{#if isReadableMessage}}
+	    			{{#if sender}}
+	    			<p class="infostamp">{{displayName sender}}</p>
+	    			{{/if}}
+	    			{{#attachments}}
+	    				{{#if isImage}}
+	    				<a href="../attachments/{{filename}}"><img src="../attachments/{{filename}}" /></a>
+	    				{{else}}
+	    				<p class="bubble"><a href="../attachments/{{filename}}">{{transfer_name}}</a></p>
+	    				{{/if}}
+	    			{{/attachments}}
+	    			{{#if content}}<p class="bubble">{{content}}</p>{{/if}}
+	    			<p class="infostamp">{{timestamp}}</p>
+	    			{{else}}
+	    			<p class="statuschange">{{{statuschange}}}</p>
+	    			<p class="infostamp statusinfostamp">{{timestamp}}</p>
+	    			{{/if}}
+	    		</div>
+	    		{{/messages}}
+	    	</div>
+    </div>
+</body>
+</html>

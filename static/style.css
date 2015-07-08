@@ -1,0 +1,95 @@
+body * {
+    font-family: "San Francisco Text", "Helvetica Neue", Helevtica, "Segoe UI", 
+Arial, sans-serif;
+	max-width: 800px;
+	margin: 0 auto;
+}
+
+div.title {
+    background-color: white;
+    width: 100%;
+    height: 40px;
+}
+
+div.title h1, div.title h2 {
+    margin: 0;
+    text-align: center;
+    font-weight: 500;
+    font-size: 16pt;
+    vertical-align: middle;
+    
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%)
+}
+
+/** content window **/
+
+.message-thread {
+    height: calc(100vh - 60px);
+    overflow-y: scroll;
+}
+
+.message {
+	margin-top: 10px;
+}
+
+.infostamp {
+	display: table;
+	font-size: 10pt;
+	color: #bbb;
+	font-weight: 400;
+	margin: 0 0 0 10px
+}
+
+.imessage .infostamp, .sms .infostamp {
+	margin: 0 10px 0 auto;
+}
+
+.message img {
+	max-width:150px;
+	border-radius: 15px;
+	max-height: 150px;
+	margin: 0 0 5px 10px;
+	display: table;
+}
+
+.imessage img, .sms img {
+	margin: 0 10px 5px auto;
+}
+
+.message .statuschange {
+	text-align: center;
+	font-size: 12pt;
+	color: #666;
+	font-weight: 500;
+}
+
+.message .statusinfostamp {
+	margin: 0 auto 0 auto;
+}
+
+/** bubbles **/
+
+.bubble {
+    border-radius: 15px;
+    background-color: lightgray;
+    padding: 5px 12px;
+    margin: 10px;
+    max-width: 45%;
+    display: table;
+	margin: 0 10px;
+}
+
+.imessage .bubble {
+    background-color: blue;
+    color: white;
+	margin-left: auto;
+}
+
+.sms .bubble {
+    background-color: green;
+    color: white;
+    margin-left: auto;
+}
+
