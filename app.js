@@ -15,6 +15,7 @@ var fatality = function(message) {
 	
 var path = require('path');
 var backupDirectory = path.resolve(argv.input);
+// HomeDomain-Library/SMS/sms.db -> in SHA1 3d0d7e5fb2ce288813306e4d4636395e047a3d28
 var messagesDbPath = path.join(backupDirectory, "3d0d7e5fb2ce288813306e4d4636395e047a3d28");
 var contactsDbPath = path.join(backupDirectory, "31bb7ba8914766d4ba40d6dfb6113c8b614be442");
 var outputDirectory = path.resolve(argv.output);
@@ -257,9 +258,12 @@ var addMessages = function(conversation, callback) {
 				
 				// Pulls in the message information
 				originalMessages.get(
-					"SELECT text, handle_id, service, date, is_from_me, cache_has_attachments, item_type, group_action_type, other_handle, group_title FROM message WHERE ROWID="+messageId,
+					"SELECT ROWID, text, handle_id, service, date, is_from_me, cache_has_attachments, item_type, group_action_type, other_handle, group_title FROM message WHERE ROWID="+messageId,
 					function(err, rawMessage) {
 						var message = {};
+						
+						// Keep the ROWID to sort the imessages and SMS later on
+						message.ROWID = rawMessage.ROWID;
 						
 						// Converts the date to something usable
 						message.timestamp = machTimeToDate(rawMessage.date);
@@ -289,7 +293,14 @@ var addMessages = function(conversation, callback) {
 								message.isReadableMessage = true;
 								
 								// Removes weird attachment characters added to messages
-								message.content = rawMessage.text.replace(/\uFFFC/g, "");
+								// Manages empty text exception
+								if (!rawMessage.text) {
+									console.log("Empty text");
+									rawMessage.text = "ERROR";
+									message.content = rawMessage.text;
+								} else {
+									message.content = rawMessage.text.replace(/\uFFFC/g, "");
+								}
 								break;
 							
 							// Add/remove group members
@@ -331,8 +342,22 @@ var addMessages = function(conversation, callback) {
 										
 										// Converting the filename to the Apple backup filename format
 										var filepath = rawAttachment.filename;
+										
+										// Somehow linked to old library / Specific case
+										filepath = filepath.replace("/var/mobile","~");
+										
 										filepath = "MediaDomain-" + filepath.substr(2);
+										
+										// Store it before sha1 conversion
+										var real_filepath = filepath;
+										
+										// Specific case where transfer_name is empty
+										if (!rawAttachment.transfer_name) {
+											rawAttachment.transfer_name = filepath.replace(/^.*[\\\/]/, '');
+										}
+
 										filepath = crypto.createHash('sha1').update(filepath).digest('hex');
+										
 										var filename = filepath + "-" + rawAttachment.transfer_name;
 										
 										attachment.filename = filename;
@@ -347,8 +372,13 @@ var addMessages = function(conversation, callback) {
 											attachment.isImage = false;
 										}
 										
-										// Copy the file
-										fs.createReadStream(path.join(backupDirectory, filepath)).pipe(fs.createWriteStream(attachmentsPath+'/'+filename));
+										// Copy the file if it exists
+										var file_test = path.join(backupDirectory, filepath);
+										if (fs.existsSync(file_test)) {
+											fs.createReadStream(path.join(backupDirectory, filepath)).pipe(fs.createWriteStream(attachmentsPath+'/'+filename));
+										} else {
+											console.log( 'File Doesn\'t Exist:', real_filepath, file_test );
+										}	
 										
 										message.attachments.push(attachment);
 									});
@@ -365,9 +395,10 @@ var addMessages = function(conversation, callback) {
 
 			},
 			function(err) {
-				// Sorts messages by oldest to newest
+				// Sorts messages by oldest to newest (based on ROWID)
 				conversation.messages.sort(function(a, b) {
-					return a.timestamp - b.timestamp;
+//					return a.timestamp - b.timestamp;
+					return a.ROWID - b.ROWID;
 				});
 				// Inserts the conversation into the internal DB
 				conversationsDb.insert(conversation, function() {
@@ -450,13 +481,38 @@ var createHTMLFiles = function(callback) {
 					} else {
 						// If a group message doesn't have a name, it is the first member and X others
 						var firstMemberName = getContactDisplayName(conversation.members[0]);
-						var otherMembersCount = conversation.members.length - 1;
-						conversation.human_name = firstMemberName + " and " + otherMembersCount + " others";
+						conversation.human_name = firstMemberName;
+						for (var tempo = 1; tempo < conversation.members.length; tempo++) {
+							var tempo_member = getContactDisplayName(conversation.members[tempo]);
+							conversation.human_name = conversation.human_name + " and " + tempo_member;
+						}
 					}
 				} else {
 					conversation.human_name = getContactDisplayName(conversation.contact_id);
 				}
 			});
+			
+			// Concatenate SMS & imessages in the same thread
+			var counter;
+			var counter2;
+			for (counter = 0; counter < conversations.length; ++counter) {
+				var current_human_name = conversations[counter].human_name;
+				var current_conversation_dbid = conversations[counter].dbid;
+				var current_conversation = conversations[counter];
+				for (counter2 = 0; counter2 < conversations.length; ++counter2) {
+					if (conversations[counter2].human_name == current_human_name && current_conversation_dbid != conversations[counter2].dbid && conversations[counter2].human_name) {
+						console.log ("Same person", conversations[counter2].human_name, " between ", current_conversation_dbid, " and ", conversations[counter2].dbid);
+						// Concatenate tables
+						var children = current_conversation.messages.concat(conversations[counter2].messages);
+						current_conversation.messages = children;
+						// Sorts messages by ROWID
+						current_conversation.messages.sort(function(a, b) {
+							return a.ROWID - b.ROWID;
+						});
+						conversations.splice(counter2--,1);
+					}
+				};
+			};
 			
 			// Creates and writes the index file
 			var indexHtml = renderIndex(conversations);
@@ -503,6 +559,11 @@ var cleanNumber = function(number) {
 	// return any email addresses, which don't need to be processed
 	
 	if (number.indexOf("@") !== -1) {
+		return number;
+	}
+	
+	// Specific case -> The contact is not a number but text only
+	if (number.match(/^\w/g)) {
 		return number;
 	}
 	
